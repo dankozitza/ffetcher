@@ -1,10 +1,21 @@
 package ffetcher
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/dankozitza/jobdist"
+	"github.com/dankozitza/stattrack"
+	"github.com/nelsam/requests"
 	"io"
 	"net/http"
 	"strings"
+)
+
+var (
+	stat              = stattrack.New("package initialized")
+	ffetcher_template = map[string]interface{}{
+		"ffetch_url":   "",
+		"ffetch_depth": 0}
 )
 
 type Fetcher interface {
@@ -145,4 +156,76 @@ func (f Ffetcher) Fetch(url string) (string, []string, error) {
 		fmt.Println(gu_err.Error())
 	}
 	return f[url].body, f[url].Urls, nil
+}
+
+type HTTPHandler Ffetcher
+
+func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	params, err := requests.New(r).Params()
+
+	// if dkutils.DeepTypeCheck(conf["ffetcher_template"], params))
+
+	if err != nil { // send the template
+		//mbp, err := json.MarshalIndent(bodyParams, "", "   ")
+		//fmt.Fprint(w, "stat id: ", stat.Id)
+		fakeworker := FfetchWorker(Ffetcher(fhh))
+		fakejob := jobdist.New(ffetcher_template, params, fakeworker)
+
+		reply := fakejob.New_Form()
+		r_map, err := json.MarshalIndent(reply, "", "   ")
+		if err != nil {
+			stat.PanicErr("could not marshal ffetcher", err)
+		}
+		fmt.Fprint(w, string(r_map))
+		return
+
+		//stat.PanicErr("could not get request params", err)
+
+		//stat.PanicErr("could not marshal ffetcher", err)
+	}
+
+	fmt.Fprintln(w, "len(params) == ", len(params))
+
+	for k, v := range params {
+		fmt.Fprint(w, "params[", k, "] == ", v, "\n")
+	}
+
+	//params["message"] = "starting ffetcher job";
+
+	worker := FfetchWorker(Ffetcher(fhh))
+
+	job := jobdist.New(ffetcher_template, params, worker)
+
+	if !job.Satisfies_Template() {
+		reply := job.New_Form()
+		r_map, err := json.MarshalIndent(reply, "", "   ")
+		if err != nil {
+			stat.PanicErr("could not marshal ffetcher", err)
+		}
+		fmt.Fprint(w, string(r_map))
+
+	} else {
+		redir_loc := job.Create_Redirect()
+		fmt.Fprint(w, "<html><body>You are being <a href=\"http://localhost:9000"+redir_loc+"\">.</body></html>")
+	}
+
+	//m_map, err := json.MarshalIndent(params, "", "   ")
+	//if err != nil {
+	//	stat.PanicErr("could not marshal ffetcher", err)
+	//}
+	//fmt.Fprint(w, string(m_map))
+}
+
+type FfetchWorker Ffetcher
+
+func (fw FfetchWorker) Work(result *map[string]interface{}) error {
+
+	res := *result
+
+	res["response"] = fw
+
+	Crawl(res["ffetch_url"].(string), 4, Ffetcher(fw))
+
+	return nil
 }
