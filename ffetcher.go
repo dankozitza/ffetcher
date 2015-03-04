@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dankozitza/jobdist"
+	"github.com/dankozitza/sconf"
 	"github.com/dankozitza/stattrack"
+	//"github.com/dankozitza/dkutils"
 	"github.com/nelsam/requests"
 	"io"
 	"net/http"
@@ -14,8 +16,8 @@ import (
 var (
 	stat              = stattrack.New("package initialized")
 	ffetcher_template = map[string]interface{}{
-		"ffetch_url":   "",
-		"ffetch_depth": 0}
+		"ffetch_url":   string(""),
+		"ffetch_depth": int64(0)}
 )
 
 type Fetcher interface {
@@ -54,7 +56,20 @@ type Fresult struct {
 }
 
 func (f Ffetcher) get_urls(url string) error {
-	largeurls := make([]string, 1024)
+	conf := sconf.Inst()
+
+	// TODO: persuade conf["ffetcher_urls_size"] to be an int64 or warn and set
+	// default value.
+
+	//cpy := int64(conf["ffetcher_urls_size"].(int))
+
+	//fmt.Println("HERE:", ok, " \\n")
+
+	//err := dkutils.ForceType(&cpy, int64(10))
+	//if err != nil {
+	//	stat.Warn(err.Error())
+	//}
+	largeurls := make([]string, int(conf["ffetcher_urls_size"].(float64)))
 	var scratch string = f[url].body
 	var ret error = nil
 
@@ -64,6 +79,8 @@ func (f Ffetcher) get_urls(url string) error {
 			ret = fmt.Errorf("get_urls: exceded length of urls array at %d", i)
 			break
 		}
+
+		// TODO: fix this mess
 		n := strings.Index(scratch, "href=\"")
 		if n >= 0 {
 			scratch = scratch[n+6:]
@@ -86,7 +103,41 @@ func (f Ffetcher) get_urls(url string) error {
 					hn = strings.Index(scratch[:en], "https:")
 				}
 				if hn != 0 {
-					largeurls[i] = url + scratch[1:en]
+					scratch2 := scratch[1:en]
+
+					// make sure scratch2 starts with a /
+					// no instead make sure scratch2 does not start with a /
+					// then make sure url does end with a /
+					fs := strings.Index(scratch2, "/")
+					if fs != 0 {
+						scratch2 = "/" + scratch2
+					}
+					//// make sure url does not end in /
+					//fmt.Println("HERE1", scratch2, "\\n")
+					//if scratch2[len(scratch2)-1:] == "/" {
+					//	scratch2 = scratch2[:len(scratch2)-1]
+					//}
+
+					// make sure url does not end in /
+					//if len(url) > 2 {
+					//	fmt.Println("HERE1", url[len(url)-1:], "\\n")
+					//	if url[len(url)-1:] == "/" {
+					//		url = url[:len(url)-2]
+					//	}
+					//}
+
+					//scratch2 = url + scratch2
+					//scratch3 := scratch2[6:]
+					//ds := strings.Index(scratch2[6:], "//")
+					//for ds >= 0 {
+					//	fmt.Println("HERE", scratch2, "\\n")
+					//	scratch2 = scratch2[:ds-1] + scratch2[ds+1:]
+					//	ds = strings.Index(scratch2, "//");
+					//}
+
+					fmt.Println("HERE2", url, "\\n")
+
+					largeurls[i] = url + scratch2
 					i++
 
 				} else {
@@ -126,6 +177,12 @@ func (f Ffetcher) Fetch(url string) (string, []string, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("Fetch: %s: %s", url, err.Error())
 	}
+
+	// check that we got a 200
+	if res.StatusCode != 200 {
+		return "", nil, nil
+	}
+
 	var str_body string
 	buff := make([]byte, 1024)
 	for {
@@ -162,15 +219,17 @@ type HTTPHandler Ffetcher
 
 func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	conf := sconf.Inst()
+	ffetcher_template["links"] = []interface{}{
+		&map[string]interface{}{
+			"href": conf["ffetcher_index"].(string),
+			"rel":  "index"}}
+
 	params, err := requests.New(r).Params()
 
-	// if dkutils.DeepTypeCheck(conf["ffetcher_template"], params))
-
 	if err != nil { // send the template
-		//mbp, err := json.MarshalIndent(bodyParams, "", "   ")
-		//fmt.Fprint(w, "stat id: ", stat.Id)
-		fakeworker := FfetchWorker(Ffetcher(fhh))
-		fakejob := jobdist.New(ffetcher_template, params, fakeworker)
+		fakeworker := FfetchWorker(Ffetcher(nil))
+		fakejob := jobdist.New(ffetcher_template, nil, fakeworker)
 
 		reply := fakejob.New_Form()
 		r_map, err := json.MarshalIndent(reply, "", "   ")
@@ -179,25 +238,13 @@ func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprint(w, string(r_map))
 		return
-
-		//stat.PanicErr("could not get request params", err)
-
-		//stat.PanicErr("could not marshal ffetcher", err)
 	}
-
-	fmt.Fprintln(w, "len(params) == ", len(params))
-
-	for k, v := range params {
-		fmt.Fprint(w, "params[", k, "] == ", v, "\n")
-	}
-
-	//params["message"] = "starting ffetcher job";
 
 	worker := FfetchWorker(Ffetcher(fhh))
 
 	job := jobdist.New(ffetcher_template, params, worker)
 
-	if !job.Satisfies_Template() {
+	if !job.Satisfies_Template() { // send the template
 		reply := job.New_Form()
 		r_map, err := json.MarshalIndent(reply, "", "   ")
 		if err != nil {
@@ -205,16 +252,10 @@ func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprint(w, string(r_map))
 
-	} else {
+	} else { // create the new resource and redirect the client
 		redir_loc := job.Create_Redirect()
-		fmt.Fprint(w, "<html><body>You are being <a href=\"http://localhost:9000"+redir_loc+"\">.</body></html>")
+		fmt.Fprint(w, "<html><body>You are being <a href=\"http://localhost:9000"+redir_loc+"\">.</body></html>\n")
 	}
-
-	//m_map, err := json.MarshalIndent(params, "", "   ")
-	//if err != nil {
-	//	stat.PanicErr("could not marshal ffetcher", err)
-	//}
-	//fmt.Fprint(w, string(m_map))
 }
 
 type FfetchWorker Ffetcher
