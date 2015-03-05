@@ -61,14 +61,6 @@ func (f Ffetcher) get_urls(url string) error {
 	// TODO: persuade conf["ffetcher_urls_size"] to be an int64 or warn and set
 	// default value.
 
-	//cpy := int64(conf["ffetcher_urls_size"].(int))
-
-	//fmt.Println("HERE:", ok, " \\n")
-
-	//err := dkutils.ForceType(&cpy, int64(10))
-	//if err != nil {
-	//	stat.Warn(err.Error())
-	//}
 	largeurls := make([]string, int(conf["ffetcher_urls_size"].(float64)))
 	var scratch string = f[url].body
 	var ret error = nil
@@ -135,7 +127,7 @@ func (f Ffetcher) get_urls(url string) error {
 					//	ds = strings.Index(scratch2, "//");
 					//}
 
-					fmt.Println("HERE2", url, "\\n")
+//					fmt.Println("HERE2", url, "\\n")
 
 					largeurls[i] = url + scratch2
 					i++
