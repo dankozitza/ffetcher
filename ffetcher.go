@@ -17,7 +17,7 @@ var (
 	stat              = stattrack.New("package initialized")
 	ffetcher_template = map[string]interface{}{
 		"ffetch_url":   string(""),
-		"ffetch_depth": int64(0)}
+		"ffetch_depth": int(0)}
 )
 
 type Fetcher interface {
@@ -127,7 +127,7 @@ func (f Ffetcher) get_urls(url string) error {
 					//	ds = strings.Index(scratch2, "//");
 					//}
 
-//					fmt.Println("HERE2", url, "\\n")
+					//					fmt.Println("HERE2", url, "\\n")
 
 					largeurls[i] = url + scratch2
 					i++
@@ -258,7 +258,7 @@ func (fw FfetchWorker) Work(result *map[string]interface{}) error {
 
 	res["response"] = fw
 
-	Crawl(res["ffetch_url"].(string), 4, Ffetcher(fw))
+	Crawl(res["ffetch_url"].(string), res["ffetch_depth"].(int), Ffetcher(fw))
 
 	return nil
 }
