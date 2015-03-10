@@ -10,7 +10,8 @@ import (
 	"github.com/nelsam/requests"
 	"io"
 	"net/http"
-	"strings"
+	"regexp"
+	//"strings"
 )
 
 var (
@@ -56,103 +57,113 @@ type Fresult struct {
 }
 
 func (f Ffetcher) get_urls(url string) error {
-	conf := sconf.Inst()
+	//conf := sconf.Inst()
 
 	// TODO: persuade conf["ffetcher_urls_size"] to be an int64 or warn and set
 	// default value.
 
-	largeurls := make([]string, int(conf["ffetcher_urls_size"].(float64)))
+	//largeurls := make([]string, int(conf["ffetcher_urls_size"].(float64)))
 	var scratch string = f[url].body
 	var ret error = nil
 
-	var i int = 0
-	for {
-		if i >= len(largeurls) {
-			ret = fmt.Errorf("get_urls: exceded length of urls array at %d", i)
-			break
-		}
+	r, err := regexp.Compile("(((ht|f)tp(s?))\\://)?(www.|[a-zA-Z].)[a-zA-Z0-9\\-\\.]+\\.(com|edu|gov|mil|net|org|biz|info|name|museum|us|ca|uk)(\\:[0-9]+)*(/($|[a-zA-Z0-9\\.\\,\\;\\?\\'\\\\\\+&amp;%\\$#\\=~_\\-]+))*")
 
-		// TODO: fix this mess
-		n := strings.Index(scratch, "href=\"")
-		if n >= 0 {
-			scratch = scratch[n+6:]
-			en := strings.Index(scratch, "\"")
-			if en >= 0 {
-
-				if scratch[:en] == "" {
-					scratch = scratch[en:]
-					continue
-				}
-
-				sn := strings.Index(scratch[:en], "//")
-				if sn == 0 {
-					scratch = "http:" + scratch
-					en = strings.Index(scratch, "\"")
-				}
-
-				hn := strings.Index(scratch[:en], "http:")
-				if hn != 0 {
-					hn = strings.Index(scratch[:en], "https:")
-				}
-				if hn != 0 {
-					scratch2 := scratch[1:en]
-
-					// make sure scratch2 starts with a /
-					// no instead make sure scratch2 does not start with a /
-					// then make sure url does end with a /
-					fs := strings.Index(scratch2, "/")
-					if fs != 0 {
-						scratch2 = "/" + scratch2
-					}
-					//// make sure url does not end in /
-					//fmt.Println("HERE1", scratch2, "\\n")
-					//if scratch2[len(scratch2)-1:] == "/" {
-					//	scratch2 = scratch2[:len(scratch2)-1]
-					//}
-
-					// make sure url does not end in /
-					//if len(url) > 2 {
-					//	fmt.Println("HERE1", url[len(url)-1:], "\\n")
-					//	if url[len(url)-1:] == "/" {
-					//		url = url[:len(url)-2]
-					//	}
-					//}
-
-					//scratch2 = url + scratch2
-					//scratch3 := scratch2[6:]
-					//ds := strings.Index(scratch2[6:], "//")
-					//for ds >= 0 {
-					//	fmt.Println("HERE", scratch2, "\\n")
-					//	scratch2 = scratch2[:ds-1] + scratch2[ds+1:]
-					//	ds = strings.Index(scratch2, "//");
-					//}
-
-					//					fmt.Println("HERE2", url, "\\n")
-
-					largeurls[i] = url + scratch2
-					i++
-
-				} else {
-					largeurls[i] = scratch[:en]
-					i++
-				}
-			}
-			scratch = scratch[en:]
-
-		} else {
-			ret = nil
-			break
-		}
+	if err != nil {
+		ret = err
 	}
 
-	if i > 0 {
-		(*f[url]).Urls = make([]string, i-1)
-		(*f[url]).Urls = largeurls[:i-1]
-		(*f[url]).done = make(chan bool)
+	(*f[url]).Urls = r.FindAllString(scratch, 10)
 
-	} else {
-		(*f[url]).Urls = nil
-	}
+	//var i int = 0
+	//for {
+	//	if i >= len(largeurls) {
+	//		stat.Warn("get_urls: exceded length of urls array at " + fmt.Sprint(i))
+	//		// this could be a warning
+	//		break
+	//	}
+	// could loop through all characters in body, starting with 10 characters
+	// increment the number of characters
+
+	// TODO: fix this mess
+	//n := strings.Index(scratch, "href=\"")
+	//if n >= 0 {
+	//	scratch = scratch[n+6:]
+	//	en := strings.Index(scratch, "\"")
+	//	if en >= 0 {
+
+	//		if scratch[:en] == "" {
+	//			scratch = scratch[en:]
+	//			continue
+	//		}
+
+	//		sn := strings.Index(scratch[:en], "//")
+	//		if sn == 0 {
+	//			scratch = "http:" + scratch
+	//			en = strings.Index(scratch, "\"")
+	//		}
+
+	//		hn := strings.Index(scratch[:en], "http:")
+	//		if hn != 0 {
+	//			hn = strings.Index(scratch[:en], "https:")
+	//		}
+	//		if hn != 0 {
+	//			scratch2 := scratch[1:en]
+
+	//			make sure scratch2 does not start with a /
+	//			// then make sure url does end with a /
+	//			fs := strings.Index(scratch2, "/")
+	//			if fs != 0 {
+	//				scratch2 = "/" + scratch2
+	//			}
+	//			//// make sure url does not end in /
+	//			//fmt.Println("HERE1", scratch2, "\\n")
+	//			//if scratch2[len(scratch2)-1:] == "/" {
+	//			//	scratch2 = scratch2[:len(scratch2)-1]
+	//			//}
+
+	//			// make sure url does not end in /
+	//			//if len(url) > 2 {
+	//			//	fmt.Println("HERE1", url[len(url)-1:], "\\n")
+	//			//	if url[len(url)-1:] == "/" {
+	//			//		url = url[:len(url)-2]
+	//			//	}
+	//			//}
+
+	//			//scratch2 = url + scratch2
+	//			//scratch3 := scratch2[6:]
+	//			//ds := strings.Index(scratch2[6:], "//")
+	//			//for ds >= 0 {
+	//			//	fmt.Println("HERE", scratch2, "\\n")
+	//			//	scratch2 = scratch2[:ds-1] + scratch2[ds+1:]
+	//			//	ds = strings.Index(scratch2, "//");
+	//			//}
+
+	//			//					fmt.Println("HERE2", url, "\\n")
+
+	//			largeurls[i] = url + scratch2
+	//			i++
+
+	//		} else {
+	//			largeurls[i] = scratch[:en]
+	//			i++
+	//		}
+	//	}
+	//	scratch = scratch[en:]
+
+	//	} else {
+	//		ret = nil
+	//		break
+	//	}
+	//}
+
+	//if i > 0 {
+	//	(*f[url]).Urls = make([]string, i-1)
+	//	(*f[url]).Urls = largeurls[:i-1]
+	//	(*f[url]).done = make(chan bool)
+
+	//} else {
+	//	(*f[url]).Urls = nil
+	//}
 
 	//(*f[url]).done <- true
 
@@ -232,7 +243,9 @@ func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	worker := FfetchWorker(Ffetcher(fhh))
+	var f Ffetcher = make(Ffetcher)
+
+	worker := FfetchWorker(Ffetcher(f))
 
 	job := jobdist.New(ffetcher_template, params, worker)
 
