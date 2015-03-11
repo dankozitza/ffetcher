@@ -8,7 +8,7 @@ import (
 var fetcher Ffetcher = make(Ffetcher)
 
 func TestCrawl(t *testing.T) {
-	Crawl("http://golang.org/", 2, fetcher)
+	Crawl("http://golang.org/", 3, fetcher)
 
 	for u, _ := range fetcher {
 		//<-fetcher[u].done
