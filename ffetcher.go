@@ -71,7 +71,7 @@ func (f Ffetcher) get_urls(url string) error {
 		conf["ffetcher_urls_size"] = newconf.(int)
 	}
 
-	r, err := regexp.Compile("(((ht|f)tp(s?))\\://)?(www.|[a-zA-Z].)[a-zA-Z0-9\\-\\.]+\\.(com|edu|gov|mil|net|org|biz|info|name|museum|us|ca|uk)(\\:[0-9]+)*(/($|[a-zA-Z0-9\\.\\,\\;\\?\\'\\\\\\+&amp;%\\$#\\=~_\\-]+))*")
+	r, err := regexp.Compile("(((ht|f)tp(s?))\\://)?(www.|[a-zA-Z].)[a-zA-Z0-9\\-\\.]+\\.(com|edu|gov|mil|net|org|biz|info|name|museum|us|ca|uk|onion)(\\:[0-9]+)*(/($|[a-zA-Z0-9\\.\\,\\;\\?\\'\\\\\\+&amp;%\\$#\\=~_\\-]+))*")
 
 	if err != nil {
 		ret = err
@@ -134,6 +134,9 @@ type HTTPHandler Ffetcher
 
 func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	// can't indent with this?
+	//enc := json.NewEncoder(w)
+
 	conf := sconf.Inst()
 	ffetcher_template["links"] = []interface{}{
 		&map[string]interface{}{
@@ -147,6 +150,9 @@ func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fakejob := jobdist.New(ffetcher_template, nil, fakeworker)
 
 		reply := fakejob.New_Form()
+
+		//err := enc.Encode(reply)
+
 		r_map, err := json.MarshalIndent(reply, "", "   ")
 		if err != nil {
 			stat.PanicErr("could not marshal ffetcher", err)
@@ -171,7 +177,9 @@ func (fhh HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	} else { // create the new resource and redirect the client
 		redir_loc := job.Create_Redirect()
-		fmt.Fprint(w, "<html><body>You are being <a href=\"http://localhost:9000"+redir_loc+"\">.</body></html>\n")
+		fmt.Fprint(w, "<html><body>You are being <a href=\"http://")
+		fmt.Fprint(w, conf["address"].(string) + ":" + conf["port"].(string))
+		fmt.Fprint(w, redir_loc + "\">.</body></html>\n")
 	}
 }
 
